@@ -13,7 +13,7 @@ This Python script retrieves stock market data from a financial website, stores 
 
     ```bash
     git clone https://github.com/Tomdrius/GPW_inference.git
-    cd stock-data-analyzer
+    cd GPW_inference
     ```
 
 2. Install the required Python packages:
