@@ -12,7 +12,7 @@ This Python script retrieves stock market data from a financial website, stores 
 1. Clone the repository:
 
     ```bash
-    git clone https://github.com/your-username/stock-data-analyzer.git
+    git clone https://github.com/Tomdrius/GPW_inference.git
     cd stock-data-analyzer
     ```
 
@@ -27,7 +27,7 @@ This Python script retrieves stock market data from a financial website, stores 
 4. Run the script:
 
     ```bash
-    python stock_data_analyzer.py
+    python main.py
     ```
 
 ## Overview
