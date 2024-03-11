@@ -1,5 +1,4 @@
 import os
-import sys
 import time
 from datetime import datetime, timedelta
 
@@ -27,25 +26,23 @@ options.add_argument('--ignore-certificate-errors')
 options.add_argument('--headless')
 options.add_argument('--log-level=3')
 driver = webdriver.Chrome(options=options)
-# driver.get('https://www.money.pl/gielda/gpw/akcje/?date=2024-03-04')
-driver.get('https://www.money.pl/gielda/gpw/akcje/')
+
+chosen_date = "2024_03_08"
+
+driver.get(f'https://www.money.pl/gielda/gpw/akcje/?date={chosen_date}')
 accept_cookie_button = "/html/body/div[3]/div/div[2]/div[3]/div/button[2]"
 
-def is_weekend():
-    now = datetime.now()
-    day_of_week = now.weekday()
-    return day_of_week >= 5
+parsed_date = datetime.strptime(chosen_date, "%Y_%m_%d")
+chosen_date = parsed_date.strftime("%d_%m_%Y")
+print(chosen_date)
+
 
 try:
-    if is_weekend():
-        raise ValueError("It is a weekend")
     cookie_button = WebDriverWait(driver, 5).until(
         EC.element_to_be_clickable((By.XPATH, accept_cookie_button))
     )
     cookie_button.click()
-except ValueError as ve:
-    print(f"Weekend exception: {ve}")
-    sys.exit()
+    
 except Exception as e:
     print(f"Error while accepting cookie files: {e}")
 
@@ -53,43 +50,9 @@ time.sleep(4)
 
 Base = declarative_base()
 
-today_date = datetime.now().strftime('%d_%m_%Y')
-yesterday_date = (datetime.now() - timedelta(days=1)).strftime('%d_%m_%Y')
-day_before_yesterday_date = (datetime.now() - timedelta(days=2)).strftime('%d_%m_%Y')
-
-
-if datetime.now().weekday() == 0:
-    yesterday_date = (datetime.now() - timedelta(days=3)).strftime('%d_%m_%Y')
-    print(yesterday_date)
-    day_before_yesterday_date = (datetime.now() - timedelta(days=4)).strftime('%d_%m_%Y')
-    print(day_before_yesterday_date)
-elif datetime.now().weekday() == 1:
-    print(yesterday_date)
-    day_before_yesterday_date = (datetime.now() - timedelta(days=4)).strftime('%d_%m_%Y')
-    print(day_before_yesterday_date)
-    
-
 class StockData(Base):
-    __tablename__ = f'stock_data_{today_date}'
-    id = Column(Integer, primary_key=True)
-    company_name = Column(String)
-    value_change = Column(Float)
-    end_day_value = Column(Float)
-    trading_value = Column(Integer)
-    max_value = Column(Float)
-
-class YesterdayStockData(Base):
-    __tablename__ = f'stock_data_{yesterday_date}'
-    id = Column(Integer, primary_key=True)
-    company_name = Column(String)
-    value_change = Column(Float)
-    end_day_value = Column(Float)
-    trading_value = Column(Integer)
-    max_value = Column(Float)
-
-
-class DayBeforeYesterdayStockData(Base):
-    __tablename__ = f'stock_data_{day_before_yesterday_date}'
+    __tablename__ = f'stock_data_{chosen_date}'
+    # __tablename__ = f'stock_data_04_03_2024'
     id = Column(Integer, primary_key=True)
     company_name = Column(String)
     value_change = Column(Float)
@@ -143,14 +106,16 @@ else:
 
             company_name = elements[0].text
             value_change = elements[1].text
+            value_change = float(value_change.replace(',', '.').replace('—', '0'))
             end_day_value = elements[2].text
             end_day_value = float(end_day_value.replace(',', '.').replace(' ', ''))
+
             trading_value = elements[3].text
             trading_value = int(trading_value.replace(' ', '').replace('—', '0'))
             max_value = elements[4].text
-            max_value = float(max_value.replace(',', '.').replace(' ', ''))
+            max_value = float(max_value.replace(',', '.').replace(' ', '').replace('—', '0'))
             max_value = max_value * VALUE_ADJUSTMENT
-
+            
             stock_data = StockData(company_name=company_name, value_change=value_change, end_day_value=end_day_value, trading_value=trading_value, max_value=max_value)
             session.add(stock_data)
             session.commit()
@@ -162,18 +127,4 @@ else:
             print(f"Error while retrieving from div {i}: {str(e)}")
 
 driver.quit()
-
-today_rows = session.query(StockData).filter(StockData.trading_value > 100000).all()
-yesterday_rows = session.query(YesterdayStockData).filter(YesterdayStockData.trading_value > 100000).all()
-day_before_yesterday_rows = session.query(DayBeforeYesterdayStockData).filter(DayBeforeYesterdayStockData.trading_value > 100000).all()
-
-count = 0
-rows = zip(today_rows, yesterday_rows, day_before_yesterday_rows)
-sorted_rows = sorted(rows, key=lambda x: sum(row.value_change for row in x), reverse=True)
-
-for today_row, yesterday_row, day_before_yesterday_row in sorted_rows:
-    if today_row.value_change > 0 and yesterday_row.value_change > 0 and day_before_yesterday_row.value_change > 0 and today_row.end_day_value >= today_row.max_value:
-        all_grow = today_row.value_change + yesterday_row.value_change + day_before_yesterday_row.value_change
-        count = count +1
-        print(f"Think to buy this: {today_row.company_name:26} | {today_row.end_day_value:7}  |  {today_row.trading_value:8}  |  {round(all_grow, 2)}")
-print(count)
+print("Finished")
