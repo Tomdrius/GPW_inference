@@ -143,12 +143,13 @@ else:
 
             company_name = elements[0].text
             value_change = elements[1].text
+            value_change = float(value_change.replace(',', '.').replace('—', '0'))
             end_day_value = elements[2].text
             end_day_value = float(end_day_value.replace(',', '.').replace(' ', ''))
             trading_value = elements[3].text
             trading_value = int(trading_value.replace(' ', '').replace('—', '0'))
             max_value = elements[4].text
-            max_value = float(max_value.replace(',', '.').replace(' ', ''))
+            max_value = float(max_value.replace(',', '.').replace(' ', '').replace('—', '0'))
             max_value = max_value * VALUE_ADJUSTMENT
 
             stock_data = StockData(company_name=company_name, value_change=value_change, end_day_value=end_day_value, trading_value=trading_value, max_value=max_value)

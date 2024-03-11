@@ -27,7 +27,7 @@ options.add_argument('--headless')
 options.add_argument('--log-level=3')
 driver = webdriver.Chrome(options=options)
 
-chosen_date = "2024_03_08"
+chosen_date = "2024_03_07"
 
 driver.get(f'https://www.money.pl/gielda/gpw/akcje/?date={chosen_date}')
 accept_cookie_button = "/html/body/div[3]/div/div[2]/div[3]/div/button[2]"
@@ -109,12 +109,11 @@ else:
             value_change = float(value_change.replace(',', '.').replace('—', '0'))
             end_day_value = elements[2].text
             end_day_value = float(end_day_value.replace(',', '.').replace(' ', ''))
-
             trading_value = elements[3].text
             trading_value = int(trading_value.replace(' ', '').replace('—', '0'))
             max_value = elements[4].text
             max_value = float(max_value.replace(',', '.').replace(' ', '').replace('—', '0'))
-            max_value = max_value * VALUE_ADJUSTMENT
+            max_value = round(max_value * VALUE_ADJUSTMENT, 2)
             
             stock_data = StockData(company_name=company_name, value_change=value_change, end_day_value=end_day_value, trading_value=trading_value, max_value=max_value)
             session.add(stock_data)
