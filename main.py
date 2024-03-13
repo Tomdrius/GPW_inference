@@ -16,9 +16,15 @@ from sqlalchemy import create_engine, inspect, Column, String, Integer, Float, e
 from sqlalchemy.orm import declarative_base, sessionmaker, scoped_session
 from sqlalchemy_utils import database_exists, create_database
 
+from twilio.rest import Client
+
 load_dotenv()
 
 VALUE_ADJUSTMENT = 0.95
+
+account_sid = os.getenv('Account_SID')
+auth_token = os.getenv('Auth_Token')
+client = Client(account_sid, auth_token)
 
 options = webdriver.ChromeOptions()
 options.add_argument("--disable-notifications")
@@ -27,7 +33,6 @@ options.add_argument('--ignore-certificate-errors')
 options.add_argument('--headless')
 options.add_argument('--log-level=3')
 driver = webdriver.Chrome(options=options)
-# driver.get('https://www.money.pl/gielda/gpw/akcje/?date=2024-03-04')
 driver.get('https://www.money.pl/gielda/gpw/akcje/')
 accept_cookie_button = "/html/body/div[3]/div/div[2]/div[3]/div/button[2]"
 
@@ -168,13 +173,37 @@ today_rows = session.query(StockData).filter(StockData.trading_value > 100000).a
 yesterday_rows = session.query(YesterdayStockData).filter(YesterdayStockData.trading_value > 100000).all()
 day_before_yesterday_rows = session.query(DayBeforeYesterdayStockData).filter(DayBeforeYesterdayStockData.trading_value > 100000).all()
 
-count = 0
+# count = 0
 rows = zip(today_rows, yesterday_rows, day_before_yesterday_rows)
 sorted_rows = sorted(rows, key=lambda x: sum(row.value_change for row in x), reverse=True)
 
-for today_row, yesterday_row, day_before_yesterday_row in sorted_rows:
-    if today_row.value_change > 0 and yesterday_row.value_change > 0 and day_before_yesterday_row.value_change > 0 and today_row.end_day_value >= today_row.max_value:
-        all_grow = today_row.value_change + yesterday_row.value_change + day_before_yesterday_row.value_change
-        count = count +1
-        print(f"Think to buy this: {today_row.company_name:26} | {today_row.end_day_value:7}  |  {today_row.trading_value:8}  |  {round(all_grow, 2)}")
-print(count)
+def odds_selection(sorted_rows):
+    results = []
+    for today_row, yesterday_row, day_before_yesterday_row in sorted_rows:
+        if today_row.value_change > 0 and yesterday_row.value_change > 0 and day_before_yesterday_row.value_change > 0 and today_row.end_day_value >= today_row.max_value:
+            all_grow = today_row.value_change + yesterday_row.value_change + day_before_yesterday_row.value_change
+            # count = count +1
+            result = f"Think to buy this: {today_row.company_name:26} | {today_row.end_day_value:7}  |  {today_row.trading_value:8}  |  {round(all_grow, 2)}"
+            sms_result = today_row.company_name
+            print(result)
+            results.append((result, sms_result))
+    return results
+odds_selection(sorted_rows)
+# print(count)
+
+message = client.messages.create(
+  from_=os.getenv('Phone_nr'),
+  to=os.getenv('My_Phone_nr'),
+  body=odds_selection(sorted_rows)[1]
+)
+
+# results_list = odds_selection(sorted_rows)
+
+# for result, sms_result in results_list:
+#     message = client.messages.create(
+#         from_=os.getenv('Phone_nr'),
+#         to=os.getenv('My_Phone_nr'),
+#         body=sms_result
+#     )
+
+print(message.sid)
