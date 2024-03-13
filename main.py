@@ -173,7 +173,6 @@ today_rows = session.query(StockData).filter(StockData.trading_value > 100000).a
 yesterday_rows = session.query(YesterdayStockData).filter(YesterdayStockData.trading_value > 100000).all()
 day_before_yesterday_rows = session.query(DayBeforeYesterdayStockData).filter(DayBeforeYesterdayStockData.trading_value > 100000).all()
 
-# count = 0
 rows = zip(today_rows, yesterday_rows, day_before_yesterday_rows)
 sorted_rows = sorted(rows, key=lambda x: sum(row.value_change for row in x), reverse=True)
 
@@ -182,28 +181,17 @@ def odds_selection(sorted_rows):
     for today_row, yesterday_row, day_before_yesterday_row in sorted_rows:
         if today_row.value_change > 0 and yesterday_row.value_change > 0 and day_before_yesterday_row.value_change > 0 and today_row.end_day_value >= today_row.max_value:
             all_grow = today_row.value_change + yesterday_row.value_change + day_before_yesterday_row.value_change
-            # count = count +1
             result = f"Think to buy this: {today_row.company_name:26} | {today_row.end_day_value:7}  |  {today_row.trading_value:8}  |  {round(all_grow, 2)}"
-            sms_result = today_row.company_name
             print(result)
-            results.append((result, sms_result))
-    return results
-odds_selection(sorted_rows)
-# print(count)
+            results.append((result))
+    combined_results = '\n'.join(results)
+    return combined_results
+sms_body = odds_selection(sorted_rows)
 
 message = client.messages.create(
   from_=os.getenv('Phone_nr'),
   to=os.getenv('My_Phone_nr'),
-  body=odds_selection(sorted_rows)[1]
+  body=sms_body
 )
-
-# results_list = odds_selection(sorted_rows)
-
-# for result, sms_result in results_list:
-#     message = client.messages.create(
-#         from_=os.getenv('Phone_nr'),
-#         to=os.getenv('My_Phone_nr'),
-#         body=sms_result
-#     )
 
 print(message.sid)
