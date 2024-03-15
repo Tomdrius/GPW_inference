@@ -7,7 +7,6 @@ from dotenv import load_dotenv
 
 from selenium import webdriver
 from selenium.webdriver.common.by import By
-from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
 from selenium.common.exceptions import StaleElementReferenceException
@@ -82,6 +81,7 @@ class StockData(Base):
     end_day_value = Column(Float)
     trading_value = Column(Integer)
     max_value = Column(Float)
+    
 
 class YesterdayStockData(Base):
     __tablename__ = f'stock_data_{yesterday_date}'
@@ -127,13 +127,34 @@ else:
     print(f"Table {StockData.__tablename__} doesn't exist, creating it.")
     Base.metadata.create_all(postgres_engine)
 
+# if inspect(postgres_engine).has_table(YesterdayStockData.__tablename__):
+#     print(f"Table {YesterdayStockData.__tablename__} already exists, skipping creation.")
+# else:
+#     print(f"Table {YesterdayStockData.__tablename__} doesn't exist, creating it.")
+#     # Base.metadata.create_all(postgres_engine)
+
+# if inspect(postgres_engine).has_table(DayBeforeYesterdayStockData.__tablename__):
+#     print(f"Table {DayBeforeYesterdayStockData.__tablename__} already exists, skipping creation.")
+# else:
+#     print(f"Table {DayBeforeYesterdayStockData.__tablename__} doesn't exist, creating it.")
+#     # Base.metadata.create_all(postgres_engine)
 
 
-    all_div_elements = WebDriverWait(driver, 4).until(
+
+    try:
+        all_div_elements = WebDriverWait(driver, 4).until(
         EC.visibility_of_all_elements_located((By.CSS_SELECTOR, "div.rt-tr-group")))
+    except Exception as e:
+        print(f"Error while retrieving elements: {str(e)}")
+    
     number_of_elements = len(all_div_elements)
 
-    for i in range(1, number_of_elements + 1):
+    # for i in range(1, number_of_elements + 1):
+    i = 0
+
+    while i < number_of_elements:
+        i += 1
+         
         company_names = f"div.rt-tr-group:nth-child({i}) > div:nth-child(1) > div:nth-child(1) > a:nth-child(1) > div:nth-child(1)"
         value_change = f"div.rt-tr-group:nth-child({i}) > div:nth-child(1) > div:nth-child(3) > div:nth-child(1)"
         end_day_value = f"div.rt-tr-group:nth-child({i}) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1)"
@@ -146,16 +167,17 @@ else:
             elements = [WebDriverWait(driver, 4).until(
                 EC.visibility_of_element_located((By.CSS_SELECTOR, element))) for element in elements_list]
 
+            def replace_decimal_separator(text):
+                text = text.replace(',', '.').replace(' ', '').replace('—', '0')
+                return float(text)
+            
             company_name = elements[0].text
-            value_change = elements[1].text
-            value_change = float(value_change.replace(',', '.').replace('—', '0'))
-            end_day_value = elements[2].text
-            end_day_value = float(end_day_value.replace(',', '.').replace(' ', ''))
-            trading_value = elements[3].text
-            trading_value = int(trading_value.replace(' ', '').replace('—', '0'))
-            max_value = elements[4].text
-            max_value = float(max_value.replace(',', '.').replace(' ', '').replace('—', '0'))
-            max_value = max_value * VALUE_ADJUSTMENT
+            value_change = replace_decimal_separator(elements[1].text)
+            end_day_value = replace_decimal_separator(elements[2].text)
+            trading_value = replace_decimal_separator(elements[3].text)
+            max_value = replace_decimal_separator(elements[4].text)
+            max_value = round(max_value * VALUE_ADJUSTMENT, 2)
+                    
 
             stock_data = StockData(company_name=company_name, value_change=value_change, end_day_value=end_day_value, trading_value=trading_value, max_value=max_value)
             session.add(stock_data)
@@ -163,7 +185,7 @@ else:
 
         except StaleElementReferenceException:
             print(f"Error while retrieving from div {i}: Element is stale")
-
+            i -= 1
         except Exception as e:
             print(f"Error while retrieving from div {i}: {str(e)}")
 
@@ -181,17 +203,17 @@ def odds_selection(sorted_rows):
     for today_row, yesterday_row, day_before_yesterday_row in sorted_rows:
         if today_row.value_change > 0 and yesterday_row.value_change > 0 and day_before_yesterday_row.value_change > 0 and today_row.end_day_value >= today_row.max_value:
             all_grow = today_row.value_change + yesterday_row.value_change + day_before_yesterday_row.value_change
-            result = f"Think to buy this: {today_row.company_name:26} | {today_row.end_day_value:7}  |  {today_row.trading_value:8}  |  {round(all_grow, 2)}"
+            result = f"Think to buy: {today_row.company_name:26} | {today_row.end_day_value:7}  |  {today_row.trading_value:8}  |  {round(all_grow, 2)}"
             print(result)
             results.append((result))
     combined_results = '\n'.join(results)
     return combined_results
 sms_body = odds_selection(sorted_rows)
 
-message = client.messages.create(
-  from_=os.getenv('Phone_nr'),
-  to=os.getenv('My_Phone_nr'),
-  body=sms_body
-)
+# message = client.messages.create(
+#   from_=os.getenv('Phone_nr'),
+#   to=os.getenv('My_Phone_nr'),
+#   body=sms_body
+# )
 
-print(message.sid)
+# print(message.sid)

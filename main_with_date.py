@@ -1,6 +1,6 @@
 import os
 import time
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from dotenv import load_dotenv
 
@@ -27,12 +27,15 @@ options.add_argument('--headless')
 options.add_argument('--log-level=3')
 driver = webdriver.Chrome(options=options)
 
-chosen_date = "2024_03_07"
+chosen_date = "2024-03-13"
 
 driver.get(f'https://www.money.pl/gielda/gpw/akcje/?date={chosen_date}')
 accept_cookie_button = "/html/body/div[3]/div/div[2]/div[3]/div/button[2]"
-
-parsed_date = datetime.strptime(chosen_date, "%Y_%m_%d")
+try:
+    parsed_date = datetime.strptime(chosen_date, "%Y-%m-%d")
+except:
+    parsed_date = datetime.strptime(chosen_date, "%Y_%m_%d")
+    
 chosen_date = parsed_date.strftime("%d_%m_%Y")
 print(chosen_date)
 
@@ -52,7 +55,6 @@ Base = declarative_base()
 
 class StockData(Base):
     __tablename__ = f'stock_data_{chosen_date}'
-    # __tablename__ = f'stock_data_04_03_2024'
     id = Column(Integer, primary_key=True)
     company_name = Column(String)
     value_change = Column(Float)
@@ -86,12 +88,20 @@ else:
     Base.metadata.create_all(postgres_engine)
 
 
-
-    all_div_elements = WebDriverWait(driver, 4).until(
+    try:
+        all_div_elements = WebDriverWait(driver, 4).until(
         EC.visibility_of_all_elements_located((By.CSS_SELECTOR, "div.rt-tr-group")))
+    except Exception as e:
+        print(f"Error while retrieving elements: {str(e)}")
+        
     number_of_elements = len(all_div_elements)
 
-    for i in range(1, number_of_elements + 1):
+    # for i in range(1, number_of_elements + 1):
+    i = 0
+
+    while i < number_of_elements:
+        i += 1
+        
         company_names = f"div.rt-tr-group:nth-child({i}) > div:nth-child(1) > div:nth-child(1) > a:nth-child(1) > div:nth-child(1)"
         value_change = f"div.rt-tr-group:nth-child({i}) > div:nth-child(1) > div:nth-child(3) > div:nth-child(1)"
         end_day_value = f"div.rt-tr-group:nth-child({i}) > div:nth-child(1) > div:nth-child(2) > div:nth-child(1)"
@@ -121,6 +131,7 @@ else:
 
         except StaleElementReferenceException:
             print(f"Error while retrieving from div {i}: Element is stale")
+            i -= 1
 
         except Exception as e:
             print(f"Error while retrieving from div {i}: {str(e)}")
