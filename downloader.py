@@ -2,11 +2,9 @@ import os
 import time
 from datetime import datetime
 
-import click
 from dotenv import load_dotenv
 
 from selenium import webdriver
-from selenium.webdriver.common.by import By
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -31,64 +29,83 @@ class StockDataRetriever:
         options.add_argument('--headless')
         options.add_argument('--log-level=3')
         self.driver = webdriver.Chrome(options=options)
-
-    def retrieve_stock_data(self, chosen_date):
+    
+    def parse_date(self, chosen_date):
         try:
             parsed_date = datetime.strptime(chosen_date, "%Y-%m-%d")
-            self.driver.get(f'https://www.money.pl/gielda/gpw/akcje/?date={chosen_date}')
+            # self.driver.get(url)
         except ValueError:
             parsed_date = datetime.strptime(chosen_date, "%Y_%m_%d")
-            self.driver.get(f'https://www.money.pl/gielda/gpw/akcje/?date={chosen_date}')
+            # self.driver.get(url)
         except:
             print(f"Error while parsing date")
+            return None
+        return parsed_date
+    
+    def accept_cookies(self):
         accept_cookie_button = "/html/body/div[3]/div/div[2]/div[3]/div/button[2]"
-        chosen_date = parsed_date.strftime("%d_%m_%Y")
-
-        Base = declarative_base()
-        class StockData(Base):
-            __tablename__ = f'stock_data_{chosen_date}'
-            id = Column(Integer, primary_key=True)
-            company_name = Column(String)
-            value_change = Column(Float)
-            end_day_value = Column(Float)
-            trading_value = Column(Integer)
-            max_value = Column(Float)
-
         try:
             cookie_button = WebDriverWait(self.driver, 5).until(
                 EC.element_to_be_clickable((By.XPATH, accept_cookie_button))
             )
             cookie_button.click()
-            
         except Exception as e:
             print(f"Error while accepting cookie files: {e}")
-
-        time.sleep(4)
-
-
-
+    
+    def create_database_session(self):
         postgres_username = os.environ['POSTGRES_USERNAME']
         postgres_password = os.environ.get('POSTGRES_PASSWORD')
         postgres_host = os.environ['POSTGRES_HOST']
         postgres_dbname = os.environ['POSTGRES_DB']
-
+        
         postgres_engine = create_engine(f'postgresql://{postgres_username}:{postgres_password}@{postgres_host}/{postgres_dbname}')
-
+        
         if not database_exists(postgres_engine.url):
             try:
                 create_database(postgres_engine.url)
             except exc.DatabaseError as e:
                 print(f"Error while creating database: {e}")
                 exit(1)
-
+            
         Session = scoped_session(sessionmaker(bind=postgres_engine))
-        session = Session()
+        return Session()
 
-        if inspect(postgres_engine).has_table(StockData.__tablename__):
+    def retrieve_stock_data(self, chosen_date):
+        parsed_date = self.parse_date(chosen_date)
+        if not parsed_date:
+            return
+        
+        chosen_date_ = parsed_date.strftime("%d_%m_%Y")
+        
+        self.driver.get(f'https://www.money.pl/gielda/gpw/akcje/?date={chosen_date}')
+        self.accept_cookies()
+
+        Base = declarative_base()
+        class StockData(Base):
+            __tablename__ = f'stock_data_{chosen_date_}'
+            id = Column(Integer, primary_key=True)
+            company_name = Column(String)
+            value_change = Column(Float)
+            end_day_value = Column(Float)
+            trading_value = Column(Integer)
+            max_value = Column(Float)
+        
+        session = self.create_database_session()
+
+
+        time.sleep(2)
+
+
+
+
+
+
+
+        if inspect(session.bind).has_table(StockData.__tablename__):
             print(f"Table {StockData.__tablename__} already exists, skipping creation.")
         else:
             print(f"Table {StockData.__tablename__} doesn't exist, creating it.")
-            Base.metadata.create_all(postgres_engine)
+            Base.metadata.create_all(session.bind)
 
             try:
                 all_div_elements = WebDriverWait(self.driver, 4).until(
@@ -98,7 +115,6 @@ class StockDataRetriever:
                 
             number_of_elements = len(all_div_elements)
 
-            # for i in range(1, number_of_elements + 1):
             i = 0
 
             while i < number_of_elements:
@@ -139,15 +155,20 @@ class StockDataRetriever:
                     print(f"Error while retrieving from div {i}: {str(e)}")
 
         self.driver.quit()
-        print("Finished")
-
+        # print("Finished")
+# date = '2024-03-22'
 def main(date):
-    print((date))
+    # parser = argparse.ArgumentParser(description="Stock data downloader")
+    # parser.add_argument("date", type=str, help="Date in format YYYY-MM-DD")
+    # args = parser.parse_args()
+    # date = args.date
+    # print(f"Downloading data for date: {date}")
+    
     retriever = StockDataRetriever()
     try:
         retriever.retrieve_stock_data(date)
     except Exception as e:
-        click.echo(f"An error occurred: {str(e)}")
+        print(f"An error occurred: {str(e)}")
     finally:
         retriever.driver.quit()
 

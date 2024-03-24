@@ -1,6 +1,4 @@
 import os
-# import sys
-# import time
 from datetime import datetime, timedelta
 from downloader import main
 from dotenv import load_dotenv
@@ -14,6 +12,7 @@ from twilio.rest import Client
 load_dotenv()
 
 VALUE_ADJUSTMENT = 0.95
+TRADING_VALUE_FILTER = 100000
 
 account_sid = os.getenv('Account_SID')
 auth_token = os.getenv('Auth_Token')
@@ -75,46 +74,60 @@ class DayBeforeYesterdayStockData(Base):
 
 
 
-postgres_username = os.environ['POSTGRES_USERNAME']
-postgres_password = os.environ.get('POSTGRES_PASSWORD')
-postgres_host = os.environ['POSTGRES_HOST']
-postgres_dbname = os.environ['POSTGRES_DB']
+def create_database_session():
+        postgres_username = os.environ['POSTGRES_USERNAME']
+        postgres_password = os.environ.get('POSTGRES_PASSWORD')
+        postgres_host = os.environ['POSTGRES_HOST']
+        postgres_dbname = os.environ['POSTGRES_DB']
+        
+        postgres_engine = create_engine(f'postgresql://{postgres_username}:{postgres_password}@{postgres_host}/{postgres_dbname}')
+        
+        if not database_exists(postgres_engine.url):
+            try:
+                create_database(postgres_engine.url)
+            except exc.DatabaseError as e:
+                print(f"Error while creating database: {e}")
+                exit(1)
+            
+        Session = scoped_session(sessionmaker(bind=postgres_engine))
+        return Session()
+session = create_database_session()
 
-postgres_engine = create_engine(f'postgresql://{postgres_username}:{postgres_password}@{postgres_host}/{postgres_dbname}')
-
-if not database_exists(postgres_engine.url):
-    try:
-        create_database(postgres_engine.url)
-    except exc.DatabaseError as e:
-        print(f"Error while creating database: {e}")
-        exit(1)
-
-Session = scoped_session(sessionmaker(bind=postgres_engine))
-session = Session()
-
-if inspect(postgres_engine).has_table(StockData.__tablename__):
+if inspect(session.bind).has_table(StockData.__tablename__):
     print(f"Table {StockData.__tablename__} already exists, skipping creation.")
 else:
     try:
         # date_today = datetime.now().strftime("%Y_%m_%d")
-        date_today = "2024-03-21"
+        date_today = (datetime.strptime(set_date()[0], "%d_%m_%Y").strftime("%Y_%m_%d"))
+        print(date_today)
         main(date=date_today)
     except Exception as e:
         print(f"Error while retrieving elements: {str(e)}")
         
-if inspect(postgres_engine).has_table(YesterdayStockData.__tablename__):
+if inspect(session.bind).has_table(YesterdayStockData.__tablename__):
     print(f"Table {YesterdayStockData.__tablename__} already exists, skipping creation.")
 else:
     try:
         date_yesterday = (datetime.strptime(set_date()[1], "%d_%m_%Y").strftime("%Y_%m_%d"))
-        main(date_yesterday)
+        print(date_yesterday)
+        main(date=date_yesterday)
+    except Exception as e:
+        print(f"Error while retrieving elements: {str(e)}")
+
+if inspect(session.bind).has_table(DayBeforeYesterdayStockData.__tablename__):
+    print(f"Table {DayBeforeYesterdayStockData.__tablename__} already exists, skipping creation.")
+else:
+    try:
+        date_day_before_yesterday = (datetime.strptime(set_date()[2], "%d_%m_%Y").strftime("%Y_%m_%d"))
+        print(date_day_before_yesterday)
+        main(date=date_day_before_yesterday)
     except Exception as e:
         print(f"Error while retrieving elements: {str(e)}")
     
 
-today_rows = session.query(StockData).filter(StockData.trading_value > 100000).all()
-yesterday_rows = session.query(YesterdayStockData).filter(YesterdayStockData.trading_value > 100000).all()
-day_before_yesterday_rows = session.query(DayBeforeYesterdayStockData).filter(DayBeforeYesterdayStockData.trading_value > 100000).all()
+today_rows = session.query(StockData).filter(StockData.trading_value > TRADING_VALUE_FILTER).all()
+yesterday_rows = session.query(YesterdayStockData).filter(YesterdayStockData.trading_value > TRADING_VALUE_FILTER).all()
+day_before_yesterday_rows = session.query(DayBeforeYesterdayStockData).filter(DayBeforeYesterdayStockData.trading_value > TRADING_VALUE_FILTER).all()
 
 rows = zip(today_rows, yesterday_rows, day_before_yesterday_rows)
 sorted_rows = sorted(rows, key=lambda x: sum(row.value_change for row in x), reverse=True)
@@ -129,10 +142,10 @@ def odds_selection(sorted_rows):
     combined_results = '\n'.join(results)
     return combined_results
 sms_body = odds_selection(sorted_rows)
-message = client.messages.create(
-  from_=os.getenv('Phone_nr'),
-  to=os.getenv('My_Phone_nr'),
-  body=sms_body
-)
+# message = client.messages.create(
+#   from_=os.getenv('Phone_nr'),
+#   to=os.getenv('My_Phone_nr'),
+#   body=sms_body
+# )
 
-print(message.sid)
+# print(message.sid)
