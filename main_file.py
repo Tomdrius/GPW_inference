@@ -51,6 +51,7 @@ class StockData(Base):
     end_day_value = Column(Float)
     trading_value = Column(Integer)
     max_value = Column(Float)
+    trade_date = set_date()[0]
     
 
 class YesterdayStockData(Base):
@@ -61,6 +62,8 @@ class YesterdayStockData(Base):
     end_day_value = Column(Float)
     trading_value = Column(Integer)
     max_value = Column(Float)
+    trade_date = set_date()[1]
+    
 
 
 class DayBeforeYesterdayStockData(Base):
@@ -71,6 +74,7 @@ class DayBeforeYesterdayStockData(Base):
     end_day_value = Column(Float)
     trading_value = Column(Integer)
     max_value = Column(Float)
+    trade_date = set_date()[2]
 
 
 
@@ -97,7 +101,6 @@ if inspect(session.bind).has_table(StockData.__tablename__):
     print(f"Table {StockData.__tablename__} already exists, skipping creation.")
 else:
     try:
-        # date_today = datetime.now().strftime("%Y_%m_%d")
         date_today = (datetime.strptime(set_date()[0], "%d_%m_%Y").strftime("%Y_%m_%d"))
         print(date_today)
         main(date=date_today)
@@ -138,14 +141,14 @@ def odds_selection(sorted_rows):
             all_grow = today_row.value_change + yesterday_row.value_change + day_before_yesterday_row.value_change
             result = f"Think to buy: {today_row.company_name:26} | {today_row.end_day_value:7}  |  {today_row.trading_value:8}  |  {round(all_grow, 2)}"
             print(result)
-            results.append((result))
+            results.append(result)
     combined_results = '\n'.join(results)
     return combined_results
 sms_body = odds_selection(sorted_rows)
-# message = client.messages.create(
-#   from_=os.getenv('Phone_nr'),
-#   to=os.getenv('My_Phone_nr'),
-#   body=sms_body
-# )
+message = client.messages.create(
+  from_=os.getenv('Phone_nr'),
+  to=os.getenv('My_Phone_nr'),
+  body=sms_body
+)
 
-# print(message.sid)
+print(message.sid)

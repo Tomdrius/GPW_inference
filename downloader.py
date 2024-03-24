@@ -89,15 +89,21 @@ class StockDataRetriever:
             end_day_value = Column(Float)
             trading_value = Column(Integer)
             max_value = Column(Float)
+            trade_date = chosen_date_
+
+            # def __init__(self, date):
+            #     """
+            #     Initializes a StockData instance with the provided date.
+            #     Args:
+            #         date (datetime.date): The date for which the stock data is retrieved.
+            #     """
+            #     self.__tablename__ = f'stock_data_{chosen_date_}'
+
         
         session = self.create_database_session()
 
 
         time.sleep(2)
-
-
-
-
 
 
 
@@ -156,7 +162,7 @@ class StockDataRetriever:
 
         self.driver.quit()
         # print("Finished")
-# date = '2024-03-22'
+# date = '2024-03-20'
 def main(date):
     # parser = argparse.ArgumentParser(description="Stock data downloader")
     # parser.add_argument("date", type=str, help="Date in format YYYY-MM-DD")

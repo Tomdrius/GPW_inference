@@ -67,7 +67,7 @@ class TestRetrieveStockData(unittest.TestCase):
         self.assertIsNone(parsed_date)
 
     def test_parse_value_error(self):
-        chosen_date = "2024-02-45"  # Nieprawidłowa data
+        chosen_date = "2024-02-45"
         parsed_date = self.retriever.parse_date(chosen_date)
         self.assertIsNone(parsed_date)
 
